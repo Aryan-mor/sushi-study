@@ -1,0 +1,40 @@
+// Cross-device watched-state sync (docs/11 §6.1). v1 carries only the watched delta -- the
+// catalog-delta half described in docs/11 §6 is not built yet (the client still does a full /home
+// refetch on launch). Field numbers below leave room for a future catalog_watermark / catalog delta
+// to be added without breaking wire compatibility.
+syntax = "proto3";
+
+package sushi.v1;
+
+message SyncReq {
+  // Last user_episode_state.seq this device has applied. Zero on first login / fresh install:
+  // the server returns everything, capped (SyncRes.watched_more), same shape as any other page.
+  int64 watched_watermark = 1;
+}
+
+// WatchedState is one user_episode_state row that changed since the caller's watermark.
+message WatchedState {
+  int64 episode_id = 1;
+  bool done = 2;
+  // Set instead of episode_id when the row is a personal video (ADR 0037 §5).
+  int64 personal_id = 3;
+}
+
+message SyncRes {
+  repeated WatchedState watched = 1;
+  // The device's next watched_watermark. Unchanged from the request when watched is empty.
+  int64 watched_watermark = 2;
+  // True when the reply was capped and more rows are waiting -- the client should call again
+  // immediately with the new watermark rather than waiting for the next launch.
+  bool watched_more = 3;
+  // The user's taste / onboarding answers, riding along so the version picker can honour them
+  // with no extra message (docs/12 §5.2). audio_pref is "original" (subtitles over dubbing),
+  // "dub", or empty when never asked; max_height is 2160 / 1080 / 720 / 480, or 0 when never
+  // asked; subtitle_lang is an ISO 639-1 code (e.g. "fa") for the default soft-sub track, or
+  // empty when never asked; subs is "on" (with subtitles), "off" (without), or empty when
+  // never asked.
+  string audio_pref = 4;
+  int32 max_height = 5;
+  string subtitle_lang = 6;
+  string subs = 7;
+}

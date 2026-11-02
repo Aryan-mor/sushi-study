@@ -1,0 +1,35 @@
+// Binding: how a client learns which API bot is its own. See docs/02-bot-protocol.md §1.
+syntax = "proto3";
+
+package sushi.v1;
+
+// Assignment is what /initbot returns. The client stores it and round-robins protocol DMs
+// across `pool` (ADR 0011). /initbot is served by init-bot, not main-bot -- main-bot only ever
+// speaks prose to a person (onboarding, support); the assignment envelope never enters that
+// chat (ADR 0004, docs/02 §1).
+message Assignment {
+  // pool[0] for proto compatibility — not an assignment (ADR 0012). Protocol DMs and Ready
+  // round-robin `pool`.
+  string api_bot_username = 1;
+
+  // Every API bot the client round-robins protocol DMs across, and accepts an answer or a push
+  // from. Must be non-empty; the client has nothing to talk to otherwise.
+  repeated string pool = 2;
+
+  int32 provider_id = 3;
+
+  // Echoed on every request. Not a password: it is an epoch check that lets the server say "your
+  // binding is stale, rebind", and catches a client restored from an old backup (docs/02 §9).
+  bytes binding_token = 4;
+
+  // Bumped whenever the binding changes.
+  uint32 epoch = 5;
+
+  // Every delivery bot in the pool deliveryd round-robins across. Unlike the API bot pool above,
+  // the client never *addresses* one of these directly — it pre-starts them (start+mute+archive,
+  // the same treatment the API pool gets) purely so a later copyMessage into this reader's chat
+  // does not fail `400 chat not found` on first contact (docs/05 §6, docs/10 Q3): the API pool is
+  // warmed in full so protocol DMs can round-robin (ADR 0011), but a delivery bot is picked per
+  // copy, so nothing warms it unless the client does this once, here.
+  repeated string delivery_bots = 6;
+}

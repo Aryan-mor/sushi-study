@@ -1,0 +1,50 @@
+// Subtitle search + fetch (doc 15 §7). Server-side only: the client never sees a provider API key
+// (SubDL today). Two round trips, mirroring Search -> Play/Files: SubtitleReq lists candidate
+// packs; SubtitleFileReq resolves one chosen pack's tag to actual subtitle text.
+syntax = "proto3";
+
+package sushi.v1;
+
+import "sushi/v1/catalog.proto";
+
+message SubtitleReq {
+  uint64 tmdb_id = 1;
+  Kind kind = 2;
+  int32 season_no = 3; // 0 for movies
+  int32 episode_no = 4; // 0 for movies
+  string lang = 5; // ISO 639-1, e.g. "fa"; empty = server default (persian)
+  // Playing file length in whole minutes, and its quality label (e.g. "1080p SoftSub").
+  // Cache lookup uses these to pick a cut that matches this file. Zero / empty skips the cache.
+  int32 duration_min = 6;
+  string source_label = 7;
+}
+
+// SubtitlePack is one candidate subtitle. tag is opaque -- pass it back to SubtitleFileReq
+// verbatim, never parse it. It never contains a provider API key (R-SEC-12): the server strips
+// SubDL's embedded key before this message is built.
+message SubtitlePack {
+  string tag = 1;
+  string release_name = 2;
+  repeated string releases = 3;
+  string lang = 4;
+  string translator = 5;
+  bool hi = 6; // hearing-impaired / SDH
+}
+
+message SubtitleRes {
+  repeated SubtitlePack packs = 1;
+}
+
+message SubtitleFileReq {
+  string tag = 1;
+}
+
+// SubtitleFileRes points at a copy of the subtitle file placed in the reader's own chat with a
+// delivery bot (doc 05-style, mirroring Play) -- never the text itself, which routinely exceeds
+// the wire's per-message text-payload limit (wire.MaxTextPayload). The client fetches the actual
+// bytes over MTProto from bot_id/message_id, exactly like a video file.
+message SubtitleFileRes {
+  int64 bot_id = 1;
+  int64 message_id = 2;
+  string ext = 3; // ".srt" or ".ass"
+}

@@ -1,0 +1,111 @@
+// Opening a title (docs/12 §4) and its pick-list (docs/12 §5).
+syntax = "proto3";
+
+package sushi.v1;
+
+import "sushi/v1/catalog.proto";
+
+message Person {
+  string name = 1;
+  string role = 2;
+  // TMDB profile path, stripped like Row.poster. Empty means no photo.
+  string profile = 3;
+  // TMDB person id. Zero means older payload without an id (render card, skip /person).
+  uint64 tmdb_id = 4;
+}
+
+// PersonReq opens a cast/crew page (ADR 0009).
+message PersonReq {
+  uint64 tmdb_id = 1;
+}
+
+// PersonRes is one message: identity + filmography rows (catalog hit preferred, else TMDB preview).
+message PersonRes {
+  uint64 tmdb_id = 1;
+  string name = 2;
+  string profile = 3;
+  string biography = 4;
+  repeated Row movies = 5;
+  repeated Row series = 6;
+}
+
+message ItemReq {
+  // items_tmdb_idx is UNIQUE(tmdb_id, kind) -- both fields together are the item's real address,
+  // the same pair the client already learned from whichever Row led here.
+  uint64 tmdb_id = 1;
+  Kind kind = 2;
+}
+
+// ItemRes is the title page: everything fetched once, on first open, and cached until a catalog
+// delta touches this item (docs/12 §4).
+message ItemRes {
+  // Same 6 fields every card already carries -- reused, not duplicated.
+  Row row = 1;
+
+  string overview = 2;
+
+  // Unix seconds; 0 means the catalog does not know it (docs/03 §2, R-META-2).
+  int64 released_on = 3;
+
+  // Play-target only on a series (first episode, or the movie's S00E00). The full tree is
+  // /episodes per season (ADR 0028). Always at least one entry when we carry the title.
+  repeated Episode episodes = 4;
+
+  string logo = 5;
+  string backdrop = 6;
+  string genres = 7;
+  int32 runtime_s = 8;
+  repeated Person people = 9;
+  // Titles we carry that TMDB lists as similar.
+  repeated Row related = 10;
+  string collection_name = 11;
+  // Other titles we carry in the same TMDB collection (box set).
+  repeated Row collection = 12;
+
+  // The viewer's own flags for this title (ADR 0017 §9). Per-user state otherwise stays on the
+  // device (docs/11 §4), but the announce channel's watch-later button writes it server-side, so
+  // the title page has to be able to read what the device never saw. Past field 15 on purpose:
+  // these are two bytes on a message sent once per title open, not hot fields.
+  bool watch_later = 13;
+  bool favorite = 14;
+
+  // Season index for series navigation. Empty on movies and TMDB-only browse pages.
+  repeated Season seasons = 15;
+
+  // YouTube video id for the trailer button (docs/12 §4, ADR 0031). Empty means none -- TMDB had
+  // no trailer, or this item has not been hydrated for it yet.
+  string trailer_key = 16;
+
+  // ISO 3166-1 alpha-2 origin country (US, IR). Empty means unknown or not hydrated.
+  string country = 17;
+}
+
+// EpisodesReq loads one season's episode list (ADR 0028). page is 0-based; the server caps
+// each page so the answer fits a Telegram text envelope (wire.MaxTextPayload).
+message EpisodesReq {
+  uint64 tmdb_id = 1;
+  Kind kind = 2;
+  int32 season_no = 3;
+  int32 page = 4;
+}
+
+message EpisodesRes {
+  repeated Episode episodes = 1;
+  int32 page = 2;
+  int32 pages = 3;
+}
+
+// FilesReq asks for one episode's pick-list. Its own request, its own ~5-minute client TTL,
+// deliberately split from ItemRes: the description is immutable, the file list is not (docs/12 §5).
+message FilesReq {
+  int64 episode_id = 1;
+}
+
+message FilesRes {
+  repeated File files = 1;
+  // Per-user resume for this episode, if the caller is bound and has one. Zero / false means none.
+  // Keyed on the episode, so switching quality does not reset (docs/06).
+  int32 position_s = 2;
+  bool done = 3;
+  int64 last_file_id = 4;
+}

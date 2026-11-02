@@ -1,0 +1,22 @@
+// In-app client update. See docs/adr/0019-in-app-update-over-bot.md.
+syntax = "proto3";
+
+package sushi.v1;
+
+// AppUpdateReq asks the API bot to copy the latest binary for this platform into the protocol
+// chat. Platform keys match app_releases / main-bot's Download picker.
+message AppUpdateReq {
+  string platform = 1;
+}
+
+// AppUpdateRes names the copied document in the protocol chat. bot_id is the copying API bot's
+// Telegram user id (getMe), not a provider_bots row — the client fetches this message over MTProto
+// the same way it fetches a delivered video.
+message AppUpdateRes {
+  int64 bot_id = 1;
+  int64 message_id = 2;
+  string version = 3;
+  string file_name = 4;
+  // Caption stamped on the copy (`app_<platform>`). The native resolver verifies it.
+  string locator = 5;
+}

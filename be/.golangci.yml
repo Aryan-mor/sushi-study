@@ -1,0 +1,86 @@
+# Sushi's Go lint gate — docs/09-engineering-rules.md §2.
+# Zero tolerated warnings (R-GO-18). A //nolint needs a specific linter and a reason (R-GO-20).
+
+run:
+  timeout: 3m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    # correctness
+    - errcheck
+    - govet
+    - staticcheck
+    - errorlint
+    - nilerr
+    - bodyclose
+    - sqlclosecheck
+    - rowserrcheck
+    - noctx
+    - contextcheck
+    - containedctx
+    - exhaustive
+    - makezero
+    - wastedassign
+    - predeclared
+    # style and shape
+    - revive
+    - gocritic
+    - unconvert
+    - unparam
+    - misspell
+    - dupl
+    # size and complexity (R-GO-17)
+    - funlen
+    - gocognit
+    # tests
+    - paralleltest
+
+linters-settings:
+  funlen:
+    lines: 60
+    statements: 45
+  gocognit:
+    min-complexity: 15
+  dupl:
+    threshold: 160
+  exhaustive:
+    default-signifies-exhaustive: true
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment # readability of a struct beats a few bytes of padding here
+  revive:
+    rules:
+      - name: exported # R-DOC-3: exported symbols carry doc comments
+      - name: package-comments
+      - name: early-return # R-GO-17: nesting <= 3, return early
+      - name: unreachable-code
+      - name: redefines-builtin-id
+  misspell:
+    locale: UK
+    # Proto/Telegram strings are US English and cannot be renamed.
+    ignore-words:
+      - favorite
+      - favorites
+      - unauthorized
+      - color # Go's image/color package; we cannot Britishise the import path
+      - organization # Infisical API path /api/v1/organization-admin
+      - appareil # French "device" in bot copy
+      - regardes # French "you watch" in bot copy
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    # Table-driven tests repeat their shape by design; that is not duplication worth removing.
+    - path: _test\.go
+      linters:
+        - dupl
+        - funlen
+        - gocognit
+        - errcheck

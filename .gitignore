@@ -1,0 +1,35 @@
+# secrets — never committed (R-SEC-1, R-SEC-5)
+.env
+.env.*
+!.env.example
+prod.env
+*.machine-identity
+
+# build / tooling
+node_modules/
+.dart_tool/
+build/
+*.exe
+*.apk
+*.aab
+.DS_Store
+Thumbs.db
+
+# editor/agent rules that describe the private deployment
+.cursor/
+
+# local scratch
+.cache/
+tmp/
+be/tmp/
+*.log
+tools/buf/.bin/
+tools/goose/.bin/
+
+# python bytecode (reader/)
+__pycache__/
+*.pyc
+
+# graphify (local knowledge graph; never commit snapshots)
+**/graphify-out/**
+**/.graphify/**

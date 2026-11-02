@@ -1,0 +1,6 @@
+# Keep the build context to what the Dockerfile actually needs (go.mod, go.sum, source) --
+# everything below is either git-ignored already or produced by tooling this image never runs.
+tmp/
+*.exe
+*.log
+.cache/

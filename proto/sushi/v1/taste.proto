@@ -1,0 +1,57 @@
+// Taste profile for the in-app first-run / profile wizard. Stored on user_prefs;
+// seeds and person search are server-side TMDB so the client never holds a key.
+syntax = "proto3";
+
+package sushi.v1;
+
+import "sushi/v1/catalog.proto";
+
+message TasteTitle {
+  uint64 tmdb_id = 1;
+  Kind kind = 2;
+}
+
+message TastePerson {
+  uint64 tmdb_id = 1;
+  string name = 2;
+  // TMDB profile path stripped like Row.poster (no leading '/', no trailing '.jpg').
+  string poster = 3;
+}
+
+// TasteReq: empty fields + write=false loads the profile and seeds.
+// write=true saves the answers and sets taste_completed_at.
+// person_query (non-empty) runs TMDB person search; write must be false.
+// seed_page (1-based) pages seed_titles from TMDB trending; page>1 returns only that page.
+// person_seed_page (1-based) pages seed_people from TMDB popular; >0 returns people-only.
+message TasteReq {
+  bool write = 1;
+  string watch_kind = 2;
+  repeated string genres = 3;
+  repeated TasteTitle liked_titles = 4;
+  repeated uint64 liked_people = 5;
+  int32 max_height = 6;
+  string audio = 7;
+  string subtitle_lang = 8;
+  string person_query = 9;
+  int32 seed_page = 10;
+  int32 person_seed_page = 11;
+  // "on" with subtitles, "off" without, empty when never asked.
+  string subs = 12;
+}
+
+message TasteRes {
+  bool complete = 1;
+  string watch_kind = 2;
+  repeated string genres = 3;
+  repeated TasteTitle liked_titles = 4;
+  repeated uint64 liked_people = 5;
+  int32 max_height = 6;
+  string audio = 7;
+  string subtitle_lang = 8;
+  repeated Row seed_titles = 9;
+  repeated TastePerson seed_people = 10;
+  // Filled only when TasteReq.person_query is set.
+  repeated TastePerson person_hits = 11;
+  // "on" / "off" / empty. Same values as TasteReq.subs.
+  string subs = 12;
+}

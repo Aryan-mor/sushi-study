@@ -1,0 +1,104 @@
+// Library lists and filters (docs/02 §5, ADR 0009).
+syntax = "proto3";
+
+package sushi.v1;
+
+import "sushi/v1/catalog.proto";
+
+enum ListScope {
+  LIST_SCOPE_UNSPECIFIED = 0;
+  LIST_SCOPE_MOVIES = 1;
+  LIST_SCOPE_SERIES = 2;
+  // One card per TMDB collection (name/poster/item_count); rows are empty and ListRes.boxsets is
+  // populated instead, the same shape LIST_SCOPE_PLAYLISTS uses for ListRes.playlists.
+  LIST_SCOPE_BOXSETS = 3;
+  LIST_SCOPE_FAVORITES = 4;
+  LIST_SCOPE_LATER = 5;
+  LIST_SCOPE_PLAYLISTS = 6;
+  // Members of one playlist; playlist_id required.
+  LIST_SCOPE_PLAYLIST = 7;
+  // Continue Watching server half (docs/11 §2, ADR 0014 §D3): (1) followed/favourited series
+  // with a serveable unfinished episode; (2) non-followed series the viewer played within the
+  // last 14 days with a serveable unfinished episode. Follow/fav rank above (2). Client merges
+  // into the Continue Watching rail.
+  LIST_SCOPE_FOR_YOU = 8;
+  // Members of one TMDB collection; collection_id required.
+  LIST_SCOPE_BOXSET = 9;
+  // The caller's personal videos (ADR 0037): rows are empty and ListRes.personal_videos is
+  // populated, newest first, paged by cursor like any other scope.
+  LIST_SCOPE_MY_VIDEOS = 10;
+}
+
+enum ListSort {
+  LIST_SORT_UNSPECIFIED = 0;
+  LIST_SORT_NAME = 1;
+  LIST_SORT_YEAR = 2;
+  LIST_SORT_RATING = 3;
+  LIST_SORT_ADDED = 4;
+  // Rails-first (docs/12 §2): items already materialised into the trending / most-watched rail
+  // (env `rails` table) come first, in rail rank order; everything else follows, newest first.
+  // The rail is a capped top-N (R-META-6), not a full ranking, so this is the closest a MOVIES/
+  // SERIES scope can get to "trending" or "most watched" ordering over the whole catalog.
+  LIST_SORT_TRENDING = 5;
+  LIST_SORT_MOST_WATCHED = 6;
+}
+
+message ListReq {
+  ListScope scope = 1;
+  ListSort sort = 2;
+  bool sort_desc = 3;
+  // Exact genre name match against items.detail.genres (comma list). Empty = no genre filter.
+  string genre = 4;
+  // Release year. Zero = no year filter.
+  uint32 year = 5;
+  // Title substring (ILIKE). Empty = no search filter.
+  string q = 6;
+  // Page offset. Zero for first page; otherwise echo ListRes.cursor.
+  uint32 cursor = 7;
+  // Required when scope = PLAYLIST.
+  int64 playlist_id = 8;
+  // Required when scope = BOXSET.
+  int64 collection_id = 9;
+}
+
+message ListRes {
+  repeated Row rows = 1;
+  // Next-page cursor. Zero means no next page.
+  uint32 cursor = 2;
+  // When scope = PLAYLISTS, rows are empty and this lists playlist cards.
+  repeated PlaylistMeta playlists = 3;
+  // When scope = BOXSETS, rows are empty and this lists box set cards.
+  repeated BoxsetMeta boxsets = 4;
+  // When scope = MY_VIDEOS, rows are empty and this lists the caller's personal videos.
+  repeated PersonalVideo personal_videos = 5;
+}
+
+// PersonalVideo is one card in My videos (ADR 0037). No thumbnail: the app takes it from the
+// delivered message the first time the video is played (ADR 0037 §6).
+message PersonalVideo {
+  // Play it with PlayReq.personal_id.
+  int64 personal_id = 1;
+  // This person's own name for the file.
+  string title = 2;
+  int32 duration_s = 3;
+  int64 size_bytes = 4;
+  // Resume point and watched flag for this caller, same meaning as a film's.
+  int32 position_s = 5;
+  bool done = 6;
+}
+
+message PlaylistMeta {
+  int64 playlist_id = 1;
+  string name = 2;
+  uint32 item_count = 3;
+}
+
+message BoxsetMeta {
+  int64 collection_id = 1;
+  // TMDB collection name, falling back to the representative title when the collection has none
+  // (ADR 0009: browse never blocks a card on a name TMDB didn't give it).
+  string name = 2;
+  // Poster of the representative (newest) member — collections have no poster of their own.
+  string poster = 3;
+  uint32 item_count = 4;
+}

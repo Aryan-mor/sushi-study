@@ -1,0 +1,81 @@
+// The home screen. See docs/12-metadata-and-tmdb.md §2.
+syntax = "proto3";
+
+package sushi.v1;
+
+import "sushi/v1/catalog.proto";
+
+// Tab splits the home screen. The client asks for movies first and fetches series lazily about a
+// second later, because that is what the user is looking at (docs/12 §2.5).
+enum Tab {
+  TAB_UNSPECIFIED = 0;
+  TAB_MOVIES = 1;
+  TAB_SERIES = 2;
+}
+
+// RailKind identifies a row of cards. Continue-watching is deliberately absent: it is the client's
+// own data and never crosses the wire (docs/12 §2).
+enum RailKind {
+  RAIL_KIND_UNSPECIFIED = 0;
+  // The hero: the newest titles we actually carry.
+  RAIL_KIND_SLIDER = 1;
+  // What people here watch, from our own play counts.
+  RAIL_KIND_MOST_WATCHED = 2;
+  // What the world is watching that we happen to have, from TMDB weekly trending.
+  RAIL_KIND_TRENDING = 3;
+}
+
+message Rail {
+  RailKind kind = 1;
+  repeated Row rows = 2;
+}
+
+// HomeReq asks for one tab.
+message HomeReq {
+  Tab tab = 1;
+
+  // The watermark the client already has. The server may answer with nothing but the same
+  // watermark, which means "your cache is current" and costs the client nothing to apply.
+  uint64 since_seq = 2;
+
+  // Client shelf key (android_new, android_tv, windows, …). Empty on old clients: latest_app is
+  // then omitted. See ADR 0019.
+  string platform = 3;
+
+  // Running client semver (1.1.191). Discover still uses latest_app; the server may later
+  // force-update from this. Empty on old clients.
+  string current_version = 4;
+}
+
+// HomeRes carries a whole tab: one message, by design (docs/12 §1).
+message HomeRes {
+  repeated Rail rails = 1;
+
+  // The watermark this answer reflects. The client stores it and sends it back next time.
+  uint64 seq = 2;
+
+  // Seconds the client should treat this as fresh. Server-driven so the TTL can be tuned without
+  // shipping an app (docs/11 §2 puts it at an hour).
+  uint32 ttl_seconds = 3;
+
+  // Newest binary on RELEASE_CHANNEL for HomeReq.platform. Omitted when the client sent no platform
+  // or that platform has no row. Still set on a cache-hit answer (empty rails). ADR 0019.
+  LatestApp latest_app = 4;
+
+  // Titles this viewer marked not interested. Sent on a cache hit too (empty rails) so a second
+  // device can hide client-owned rows (continue watching) without waiting for a rail rebuild.
+  // Search does not use this list.
+  repeated NotInterestedTitle not_interested = 5;
+}
+
+// NotInterestedTitle is one hidden Home card. Kind distinguishes a film and a show that share a TMDB id.
+message NotInterestedTitle {
+  uint64 tmdb_id = 1;
+  Kind kind = 2;
+}
+
+// LatestApp is the discover half of in-app update (ADR 0019). Install is a separate /appupdate.
+message LatestApp {
+  string platform = 1;
+  string version = 2;
+}

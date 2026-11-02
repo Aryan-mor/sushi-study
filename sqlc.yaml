@@ -1,0 +1,25 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: db/migrations/env
+    queries: db/queries/env
+    gen:
+      go:
+        package: pg
+        out: be/internal/adapter/pg
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        emit_empty_slices: true
+        output_files_suffix: _gen
+
+  - engine: postgresql
+    schema: db/migrations/library
+    queries: db/queries/library
+    gen:
+      go:
+        package: pglib
+        out: be/internal/adapter/pglib
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        emit_empty_slices: true
+        output_files_suffix: _gen

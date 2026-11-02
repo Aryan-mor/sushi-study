@@ -1,0 +1,13 @@
+// User prefs the client needs at playback time (doc 15 §12). The Gemini key is the user's, sealed
+// at rest by main-bot, opened here so the app can call Google with it. Never logged.
+syntax = "proto3";
+
+package sushi.v1;
+
+message PrefsReq {}
+
+message PrefsRes {
+  bool has_gemini_key = 1;
+  // Plaintext only when has_gemini_key is true. Empty otherwise. Client must not persist it.
+  string gemini_api_key = 2;
+}

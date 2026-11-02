@@ -1,0 +1,80 @@
+// Media delivery: turning a file id into bytes in the reader's chat. See docs/05-media-delivery.md.
+syntax = "proto3";
+
+package sushi.v1;
+
+// Mode does not change server behaviour today (docs/05 §7: stream and download are the same copy,
+// only the client's sink differs) — it is carried because the client sends it, and future signals
+// (offline-only file variants, say) have somewhere to attach without a wire change.
+enum Mode {
+  MODE_UNSPECIFIED = 0;
+  MODE_STREAM = 1;
+  MODE_DOWNLOAD = 2;
+}
+
+message PlayReq {
+  // Exactly one of file_id / personal_id is set. They are separate id spaces (ADR 0037): a
+  // personal video is never addressed through file_id, so an older server that ignores field 4
+  // cannot play the catalog file that happens to share its number.
+  int64 file_id = 1;
+
+  // Set when the client could not find a previously delivered message (deleted, wrong chat, cleared
+  // history). The server deletes any existing row and re-delivers rather than trusting it
+  // (docs/05 §4, "broken row").
+  bool force = 2;
+
+  Mode mode = 3;
+
+  // A personal video (ADR 0037). The server plays it only for someone holding a grant; anyone else
+  // gets ERR_CODE_NOT_FOUND, the same as an id that does not exist.
+  int64 personal_id = 4;
+}
+
+// Delivered is a row that already exists: nothing to copy, just hand back where it landed.
+message Delivered {
+  int32 bot_id = 1;
+  int64 message_id = 2;
+
+  // Echoed so the client can verify the message it finds before trusting it (docs/05 §3).
+  string locator = 3;
+}
+
+// Pending means the copy has been queued; deliveryd performs it out of band. The client arms an
+// MTProto waiter on the delivery bot chat for this exact locator before it ever sends /play
+// (docs/05 §4) — arming after asking risks losing the update for a bot-login client that cannot
+// search its own DM history.
+message Pending {
+  string locator = 1;
+}
+
+message PlayRes {
+  oneof outcome {
+    Delivered delivered = 1;
+    Pending pending = 2;
+  }
+}
+
+// AckReq reports the message id the client actually saw, so the server can tell "delivered" from
+// "delivered and confirmed" (docs/05 §6) — an ack is not proof of delivery, only a hint for /ack
+// bookkeeping; a play that later fails to fetch this id still falls back to force re-delivery.
+message AckReq {
+  int64 file_id = 1;
+  int64 message_id = 2;
+  // Set instead of file_id when the ack is for a personal video (ADR 0037).
+  int64 personal_id = 3;
+}
+
+message AckRes {}
+
+// Ready is a server -> client push (docs/02 §8), sent after a *pending* play finishes copying. It
+// exists for a bot-login client: it cannot search its own DM history, so a push that fixes the
+// copy in *this* file's messageId is the only way to recover a live update it missed (docs/05 §6).
+// A session client generally sees the copy live and does not need it, but the server sends it
+// unconditionally -- there is no cheap way to know which case a given reader is.
+message Ready {
+  int64 file_id = 1;
+  int32 bot_id = 2;
+  int64 message_id = 3;
+  // Set instead of file_id when the copy was a personal video (ADR 0037).
+  int64 personal_id = 4;
+}

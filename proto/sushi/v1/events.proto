@@ -1,0 +1,71 @@
+// Fire-and-forget client events (docs/02 §5, docs/11 §5). No response.
+syntax = "proto3";
+
+package sushi.v1;
+
+import "sushi/v1/catalog.proto";
+
+message Events {
+  // Client sequence for dedupe; server keeps last_seq per chat.
+  uint64 seq = 1;
+  repeated Event events = 2;
+}
+
+message Event {
+  oneof body {
+    FavEvent fav = 1;
+    LaterEvent later = 2;
+    FollowEvent follow = 3;
+    ProgEvent prog = 4;
+    WatchedEvent watched = 5;
+    NotInterestedEvent not_interested = 6;
+  }
+}
+
+message FavEvent {
+  uint64 tmdb_id = 1;
+  Kind kind = 2;
+  bool on = 3;
+}
+
+message LaterEvent {
+  uint64 tmdb_id = 1;
+  Kind kind = 2;
+  bool on = 3;
+}
+
+// NotInterestedEvent hides a title from Home. Search still returns it. on=false puts it back.
+message NotInterestedEvent {
+  uint64 tmdb_id = 1;
+  Kind kind = 2;
+  bool on = 3;
+}
+
+// FollowEvent toggles a series follow (ADR 0014 §D3): notify me about new episodes. Kind is always
+// series, so it carries no kind field. Rides the same fire-and-forget batch as fav / later.
+message FollowEvent {
+  uint64 tmdb_id = 1;
+  bool on = 2;
+}
+
+// ProgEvent is one-way playback progress, keyed on the episode not the file (docs/06).
+// last_file_id is a preference. The server marks done at ≥90% of duration_s (or files.duration_s
+// when this field is 0). No reply (R-WRITE-4).
+message ProgEvent {
+  int64 episode_id = 1;
+  int32 position_s = 2;
+  int64 file_id = 3;
+  int32 duration_s = 4;
+  // Set instead of episode_id for a personal video (ADR 0037 §5). Same resume behaviour as a
+  // film, but never a play_event: those feed rails other people see.
+  int64 personal_id = 5;
+}
+
+// WatchedEvent is a manual mark-as-watched / unwatched. Not playback: position stays 0 and no
+// play_event is written. done lands on user_episode_state and rides the sync delta (docs/11 §6.1).
+message WatchedEvent {
+  int64 episode_id = 1;
+  bool done = 2;
+  // Set instead of episode_id for a personal video (ADR 0037 §5).
+  int64 personal_id = 3;
+}

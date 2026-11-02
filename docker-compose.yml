@@ -1,0 +1,17 @@
+# Local Postgres for development. Logical replication carries the catalog from the library
+# database to each environment database, so wal_level has to be logical.
+services:
+  postgres:
+    image: postgres:16-alpine
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=8", "-c", "max_wal_senders=8"]
+    environment:
+      POSTGRES_USER: sushi_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: sushi_library
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - sushi-pgdata:/var/lib/postgresql/data
+
+volumes:
+  sushi-pgdata:

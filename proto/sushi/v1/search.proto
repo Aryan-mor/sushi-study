@@ -1,0 +1,29 @@
+// Search: server-side, since the client has no TMDB access. See docs/12-metadata-and-tmdb.md §6.
+syntax = "proto3";
+
+package sushi.v1;
+
+import "sushi/v1/catalog.proto";
+
+// SearchReq is one committed query -- never sent per keystroke, debounced >= 400ms client-side
+// (R-META-3).
+message SearchReq {
+  string query = 1;
+
+  // Paging offset: 0 for the first page, otherwise the cursor a previous SearchRes returned.
+  // Opaque to the client -- it only ever echoes back what it was given.
+  uint32 cursor = 2;
+}
+
+// SearchRes is one page of compact rows, ranked by title similarity (pg_trgm, R-META-10).
+message SearchRes {
+  repeated Row rows = 1;
+
+  // The cursor for the next page. Zero means there is no next page.
+  uint32 cursor = 2;
+
+  // Titles from TMDB that are not in catalog items. At most 5, only on the first page
+  // (cursor == 0). Empty when TMDB is off, times out, or every hit is already in catalog
+  // (ADR 0010). Same Row shape as rows — client captions them as unavailable.
+  repeated Row missing = 3;
+}

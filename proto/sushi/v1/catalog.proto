@@ -1,0 +1,90 @@
+// The catalog types that travel on the wire. See docs/12-metadata-and-tmdb.md §1.
+//
+// Everything here is sized for a transport that is a 4096-character text field used about once a
+// second, so the rules from docs/03-wire-format.md §2 are not style preferences:
+//   - field numbers 1-15 (one-byte tags) belong to fields present in every message,
+//   - no string where an enum or an id will do,
+//   - no google.protobuf.* wrappers.
+syntax = "proto3";
+
+package sushi.v1;
+
+// Kind distinguishes the two things the catalog holds. Episodes are addressed as a series tmdb_id
+// plus season and episode numbers (docs/06-data-model.md §5), never as their own kind here.
+enum Kind {
+  KIND_UNSPECIFIED = 0;
+  KIND_MOVIE = 1;
+  KIND_SERIES = 2;
+}
+
+// Row is one card: everything needed to render it, and nothing else.
+//
+// The full record - overview, backdrop, cast, season tree - arrives only when a title is opened,
+// and is then cached until a delta touches it. Roughly 61 bytes on the wire, which is what makes a
+// whole home screen fit in one message.
+message Row {
+  // TMDB id, which is also the item's address in this protocol: we mint no id of our own
+  // (docs/06-data-model.md §5).
+  uint64 tmdb_id = 1;
+
+  Kind kind = 2;
+
+  // Display title, in the user's language where the catalog has one.
+  string title = 3;
+
+  // Release year. Zero means the catalog does not know it - render the card without it rather
+  // than hiding the title (R-META-2).
+  uint32 year = 4;
+
+  // TMDB rating scaled to 0-100, so it costs one byte instead of a float. Zero means unrated.
+  uint32 rating = 5;
+
+  // TMDB poster path, stripped of its leading '/' and trailing '.jpg' - 27 characters of the
+  // ~61-byte row, and the largest single field. The client rebuilds the URL and picks its own
+  // size (R-META-8). Empty means no poster: render a placeholder, never an empty card.
+  string poster = 6;
+}
+
+// Season is the index row on a series title page (ADR 0028). Episode bodies arrive later via
+// /episodes after the user picks a season — never the whole tree on /item.
+message Season {
+  int32 season_no = 1;
+  int32 episode_count = 2;
+}
+
+// Episode is one entry of a title's season/episode tree (docs/12 §4, §5). A movie gets exactly one
+// -- season 0, episode 0, the same convention fetcherd already writes (docs/06 §2) -- not a special
+// case: it is what gives the client an episode id to ask Files with, movie or series alike.
+message Episode {
+  // The wire address for files() -- episodes.id, not a season/episode pair (docs/06 §5: an episode
+  // has no TMDB id of its own to hang one off).
+  int64 episode_id = 1;
+  int32 season_no = 2;
+  int32 episode_no = 3;
+  string title = 4;
+}
+
+// FileState mirrors files.state exactly (1 ready, 2 pending, 3 unavailable) -- no translation table,
+// just a name for what the client must not offer to play as if it always could.
+enum FileState {
+  FILE_STATE_UNSPECIFIED = 0;
+  FILE_STATE_READY = 1;
+  FILE_STATE_PENDING = 2;
+  FILE_STATE_UNAVAILABLE = 3;
+}
+
+// File is one encoding of one episode: the pick-list (docs/12 §5).
+message File {
+  int64 file_id = 1;
+  string quality_label = 2;
+  int32 height = 3;
+  // Comma-separated ISO 639-1, Persian and English first (catalog.NormalizeLangs, docs/12 §5.1).
+  string audio_langs = 4;
+  string sub_langs = 5;
+  int64 size_bytes = 6;
+  int32 duration_s = 7;
+  FileState state = 8;
+  // Admin-set label. Empty means show quality_label. Non-empty wins in the picker
+  // and pins this file ahead of the automatic quality choice.
+  string display_name = 9;
+}

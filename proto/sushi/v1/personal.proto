@@ -1,0 +1,22 @@
+// Personal video actions (ADR 0038). Command "personal".
+syntax = "proto3";
+
+package sushi.v1;
+
+enum PersonalAction {
+  PERSONAL_ACTION_UNSPECIFIED = 0;
+  // main-bot sends this person, on their Telegram account, a warning and then the video's share
+  // link. One link per video, reused by everyone who shares it.
+  PERSONAL_ACTION_SHARE = 1;
+  // Ends this person's access. The video and everyone else's access stay.
+  PERSONAL_ACTION_DELETE = 2;
+}
+
+message PersonalReq {
+  int64 personal_id = 1;
+  PersonalAction action = 2;
+}
+
+// Empty: the delete is done, or the share is queued for main-bot. Without access the answer is
+// ERR_CODE_NOT_FOUND, like any personal id the caller does not hold.
+message PersonalRes {}

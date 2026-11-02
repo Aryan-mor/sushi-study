@@ -1,0 +1,31 @@
+// Content requests (ADR 0014 §D2): asking for a movie or whole series we do not carry yet. One
+// request, one typed answer -- the user needs to know immediately whether it landed, was a
+// duplicate, is already here, or hit the daily cap.
+syntax = "proto3";
+
+package sushi.v1;
+
+import "sushi/v1/catalog.proto";
+
+message RequestReq {
+  uint64 tmdb_id = 1;
+  Kind kind = 2;
+}
+
+// RequestOutcome is a closed set. QUOTA_EXCEEDED is a product limit with its own copy, not
+// transport backpressure -- deliberately NOT ErrCode.ERR_CODE_RATE (docs/02 §6).
+enum RequestOutcome {
+  REQUEST_OUTCOME_UNSPECIFIED = 0;
+  REQUEST_OUTCOME_ACCEPTED = 1;
+  REQUEST_OUTCOME_DUPLICATE = 2;
+  REQUEST_OUTCOME_ALREADY_AVAILABLE = 3;
+  REQUEST_OUTCOME_QUOTA_EXCEEDED = 4;
+}
+
+message RequestRes {
+  RequestOutcome outcome = 1;
+
+  // Requests the caller has left in the current 24h window. Zero for staff (unlimited) -- the
+  // client shows no counter in that case.
+  uint32 remaining_today = 2;
+}

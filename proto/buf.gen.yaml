@@ -1,0 +1,10 @@
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/Aryan-mor/sushi-study/be/internal/protocol
+plugins:
+  - local: protoc-gen-go
+    out: ../be/internal/protocol
+    opt: paths=source_relative

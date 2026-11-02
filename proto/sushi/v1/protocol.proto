@@ -1,0 +1,112 @@
+// Protocol-level types: what an envelope's type field means, and how failure is reported.
+// See docs/02-bot-protocol.md §5 and §6.
+syntax = "proto3";
+
+package sushi.v1;
+
+// MsgType is the value carried in the envelope header. It tells the decoder which message the
+// payload is, so the payload itself needs no discriminator.
+//
+// Numbers are permanent: an envelope in flight outlives any deploy.
+enum MsgType {
+  MSG_TYPE_UNSPECIFIED = 0;
+
+  // Reads: request -> exactly one answer.
+  MSG_TYPE_HOME_REQ = 1;
+  MSG_TYPE_HOME_RES = 2;
+  MSG_TYPE_ITEM_REQ = 3;
+  MSG_TYPE_ITEM_RES = 4;
+  MSG_TYPE_FILES_REQ = 5;
+  MSG_TYPE_FILES_RES = 6;
+  MSG_TYPE_SEARCH_REQ = 7;
+  MSG_TYPE_SEARCH_RES = 8;
+  MSG_TYPE_PLAY_REQ = 9;
+  MSG_TYPE_PLAY_RES = 10;
+  MSG_TYPE_SYNC_REQ = 11;
+  MSG_TYPE_SYNC_RES = 12;
+
+  // Writes: fire-and-forget, never answered (docs/11 §5).
+  MSG_TYPE_EVENTS = 13;
+
+  // Anything can fail, so the error type keeps a one-byte tag.
+  MSG_TYPE_ERR = 14;
+
+  // main-bot's answer to /initbot.
+  MSG_TYPE_ASSIGNMENT = 15;
+
+  // Server -> client, unsolicited, with corr = 0 (docs/02 §8).
+  MSG_TYPE_PUSH_READY = 16;
+  MSG_TYPE_PUSH_CATALOG_BUMPED = 17;
+  MSG_TYPE_PUSH_REBIND = 18;
+  MSG_TYPE_PUSH_NOTICE = 19;
+
+  // ack has no slot among 1-15 (those were spoken for before it was implemented); appended here
+  // rather than renumbered in, since numbers are permanent once shipped.
+  MSG_TYPE_ACK_REQ = 20;
+  MSG_TYPE_ACK_RES = 21;
+
+  // On-demand person filmography and library lists (ADR 0009). Appended; numbers permanent.
+  MSG_TYPE_PERSON_REQ = 22;
+  MSG_TYPE_PERSON_RES = 23;
+  MSG_TYPE_LIST_REQ = 24;
+  MSG_TYPE_LIST_RES = 25;
+
+  // Content requests (ADR 0014 §D2). Appended; numbers permanent.
+  MSG_TYPE_REQUEST_REQ = 26;
+  MSG_TYPE_REQUEST_RES = 27;
+
+  // User prefs snapshot (doc 15 §12 Gemini key). Appended; numbers permanent.
+  MSG_TYPE_PREFS_REQ = 28;
+  MSG_TYPE_PREFS_RES = 29;
+
+  // In-app update (ADR 0019). Appended; numbers permanent.
+  MSG_TYPE_APP_UPDATE_REQ = 30;
+  MSG_TYPE_APP_UPDATE_RES = 31;
+
+  // Per-season episode list (ADR 0028). Appended; numbers permanent.
+  MSG_TYPE_EPISODES_REQ = 32;
+  MSG_TYPE_EPISODES_RES = 33;
+
+  // Subtitle search + fetch, server-proxied to a provider API key the client never sees
+  // (doc 15 §7). Appended; numbers permanent.
+  MSG_TYPE_SUBTITLE_REQ = 34;
+  MSG_TYPE_SUBTITLE_RES = 35;
+  MSG_TYPE_SUBTITLE_FILE_REQ = 36;
+  MSG_TYPE_SUBTITLE_FILE_RES = 37;
+
+  // Taste profile wizard (first-run + profile re-edit). Appended; numbers permanent.
+  MSG_TYPE_TASTE_REQ = 38;
+  MSG_TYPE_TASTE_RES = 39;
+
+  // Personal video share / delete (ADR 0038). Appended; numbers permanent.
+  MSG_TYPE_PERSONAL_REQ = 40;
+  MSG_TYPE_PERSONAL_RES = 41;
+}
+
+// ErrCode is a closed set. Errors are a response type, never prose - the client decides what to
+// show the user, in the user's language (docs/02 §6).
+enum ErrCode {
+  ERR_CODE_UNSPECIFIED = 0;
+  // Slow down; retry_after_ms says how long. The client honours it exactly rather than guessing.
+  ERR_CODE_RATE = 1;
+  // The binding is stale: go to main-bot, run /initbot, retry (docs/02 §7).
+  ERR_CODE_REBIND = 2;
+  // This chat has no binding. Not a content permission - the catalog is public (docs/02 §9).
+  ERR_CODE_AUTH = 3;
+  ERR_CODE_NOT_FOUND = 4;
+  ERR_CODE_INTERNAL = 5;
+  // The provider could not serve the media; the catalog entry may be stale.
+  ERR_CODE_PROVIDER = 6;
+  // The client is older than the minimum supported protocol revision (docs/03 §6).
+  ERR_CODE_UPGRADE_REQUIRED = 7;
+  // Registration is closed and this person has no account and no invite (ADR 0039). Not retryable:
+  // sending them to main-bot would only get the same answer.
+  ERR_CODE_NOT_PUBLIC = 8;
+}
+
+message Err {
+  ErrCode code = 1;
+
+  // How long to wait before retrying, for ERR_CODE_RATE. Zero means "do not retry automatically".
+  uint32 retry_after_ms = 2;
+}
